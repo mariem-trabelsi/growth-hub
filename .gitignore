@@ -1,0 +1,6 @@
+# Données personnelles et secrets : jamais sur GitHub
+donnees.json
+config.json
+sauvegardes/
+*.tmp
+__pycache__/

@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Growth Hub</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="barre">
+  <div class="marque">Growth Hub</div>
+  <nav class="onglets" role="tablist">
+    <button data-vue="aujourdhui" class="actif">Aujourd'hui</button>
+    <button data-vue="taches">Tâches</button>
+    <button data-vue="calendrier">Calendrier</button>
+    <button data-vue="stats">Statistiques</button>
+    <button data-vue="ressources">Ressources</button>
+    <button data-vue="conseiller">Conseiller IA</button>
+    <button data-vue="reglages">Réglages</button>
+  </nav>
+  <span id="etat-sauvegarde" class="etat"></span>
+</header>
+
+<main>
+  <!-- AUJOURD'HUI -->
+  <section id="vue-aujourdhui" class="vue actif">
+    <h1 id="titre-jour"></h1>
+    <div class="grille-2">
+      <div class="carte">
+        <h2>Routine du jour</h2>
+        <p class="aide">Coche ce que tu as fait. La série compte les jours où tu as fait au moins la moitié.</p>
+        <ul id="liste-habitudes" class="liste"></ul>
+        <div class="progression"><div id="barre-habitudes"></div></div>
+        <p id="resume-habitudes" class="discret"></p>
+      </div>
+      <div class="carte">
+        <h2>Concentration</h2>
+        <div class="minuteur">
+          <div id="affichage-minuteur">25:00</div>
+          <select id="minuteur-tache"><option value="">Sans tâche</option></select>
+          <div class="ligne">
+            <select id="minuteur-duree">
+              <option value="15">15 min</option><option value="25" selected>25 min</option>
+              <option value="45">45 min</option><option value="60">60 min</option>
+            </select>
+            <button id="minuteur-lancer" class="principal">Lancer</button>
+            <button id="minuteur-arreter">Arrêter</button>
+          </div>
+          <p id="focus-jour" class="discret"></p>
+        </div>
+      </div>
+    </div>
+    <div class="carte">
+      <h2>À faire aujourd'hui</h2>
+      <form id="ajout-rapide" class="ligne">
+        <input id="ajout-rapide-titre" placeholder="Nouvelle tâche pour aujourd'hui…" required>
+        <select id="ajout-rapide-cat"></select>
+        <button class="principal">Ajouter</button>
+      </form>
+      <ul id="liste-jour" class="liste"></ul>
+    </div>
+  </section>
+
+  <!-- TÂCHES -->
+  <section id="vue-taches" class="vue">
+    <h1>Tâches</h1>
+    <form id="form-tache" class="carte form-grille">
+      <input id="t-titre" placeholder="Titre de la tâche" required>
+      <select id="t-cat"></select>
+      <select id="t-prio">
+        <option value="haute">Priorité haute</option>
+        <option value="normale" selected>Priorité normale</option>
+        <option value="basse">Priorité basse</option>
+      </select>
+      <input id="t-date" type="date" title="Échéance">
+      <input id="t-min" type="number" min="5" step="5" placeholder="Minutes" title="Durée estimée">
+      <input id="t-notes" placeholder="Notes ou lien (facultatif)">
+      <button class="principal">Ajouter la tâche</button>
+    </form>
+    <div class="filtres ligne">
+      <select id="f-statut">
+        <option value="ouvertes">À faire</option><option value="faites">Faites</option><option value="toutes">Toutes</option>
+      </select>
+      <select id="f-cat"><option value="">Toutes les catégories</option></select>
+      <input id="f-texte" placeholder="Rechercher…">
+    </div>
+    <ul id="liste-taches" class="liste"></ul>
+  </section>
+
+  <!-- CALENDRIER -->
+  <section id="vue-calendrier" class="vue">
+    <div class="ligne entete-cal">
+      <button id="cal-prec" aria-label="Mois précédent">‹</button>
+      <h1 id="cal-titre"></h1>
+      <button id="cal-suiv" aria-label="Mois suivant">›</button>
+      <button id="cal-auj">Aujourd'hui</button>
+    </div>
+    <div class="grille-cal-2">
+      <div>
+        <div class="jours-semaine"><span>lun</span><span>mar</span><span>mer</span><span>jeu</span><span>ven</span><span>sam</span><span>dim</span></div>
+        <div id="cal-grille" class="cal-grille"></div>
+      </div>
+      <div class="carte" id="cal-detail"></div>
+    </div>
+  </section>
+
+  <!-- STATISTIQUES -->
+  <section id="vue-stats" class="vue">
+    <div class="ligne entete-stats">
+      <h1>Statistiques</h1>
+      <div class="segment" id="stats-periode">
+        <button data-jours="7">7 jours</button><button data-jours="30" class="actif">30 jours</button><button data-jours="90">90 jours</button>
+      </div>
+    </div>
+    <div id="tuiles" class="tuiles"></div>
+    <div class="carte">
+      <h2>Activité par jour</h2>
+      <p class="aide">Tâches terminées et habitudes cochées, jour par jour.</p>
+      <div id="graph-jours" class="graph"></div>
+    </div>
+    <div class="grille-2">
+      <div class="carte">
+        <h2>Tâches terminées par catégorie</h2>
+        <div id="graph-cats" class="graph"></div>
+      </div>
+      <div class="carte">
+        <h2>Régularité sur 12 semaines</h2>
+        <p class="aide">Plus la case est foncée, plus la journée a été active.</p>
+        <div id="carte-chaleur"></div>
+      </div>
+    </div>
+    <div class="carte">
+      <h2>Habitudes : taux de réussite</h2>
+      <div id="graph-habitudes" class="graph"></div>
+    </div>
+    <div id="infobulle" class="infobulle" hidden></div>
+  </section>
+
+  <!-- RESSOURCES -->
+  <section id="vue-ressources" class="vue">
+    <h1>Ressources</h1>
+    <div class="filtres ligne">
+      <select id="r-statut">
+        <option value="">Tous les statuts</option><option value="a-faire">À faire</option>
+        <option value="en-cours">En cours</option><option value="termine">Terminé</option>
+      </select>
+      <select id="r-domaine"><option value="">Tous les domaines</option></select>
+    </div>
+    <ul id="liste-ressources" class="cartes-ressources"></ul>
+    <details class="carte">
+      <summary>Ajouter une ressource à la main</summary>
+      <form id="form-ressource" class="form-grille">
+        <input id="r-titre" placeholder="Titre" required>
+        <input id="r-url" type="url" placeholder="Lien (https://…)">
+        <input id="r-dom" placeholder="Domaine (ex. SQL)" required>
+        <select id="r-type">
+          <option>cours</option><option>vidéo</option><option>article</option><option>exercice</option><option>certification</option><option>livre</option>
+        </select>
+        <button class="principal">Ajouter</button>
+      </form>
+    </details>
+  </section>
+
+  <!-- CONSEILLER IA -->
+  <section id="vue-conseiller" class="vue">
+    <h1>Conseiller IA</h1>
+    <p class="aide">Le conseiller connaît ton profil (Réglages) et tes statistiques. Les liens qu'il propose sont à vérifier :
+      chaque ressource a aussi un lien de recherche sûr.</p>
+    <div class="carte">
+      <div class="ligne raccourcis">
+        <button data-raccourci="domaine">Cours sur un domaine métier</button>
+        <button data-raccourci="entretien">Préparer un entretien</button>
+        <button data-raccourci="plan">Plan de ma semaine</button>
+        <button data-raccourci="bilan">Bilan de ma productivité</button>
+      </div>
+      <form id="form-ia" class="ligne">
+        <input id="ia-question" placeholder="Ex. : « paie et DSN », « Vneuron, consultante TBML », ou une question libre" required>
+        <select id="ia-mode">
+          <option value="ressources">Ressources</option><option value="plan">Plan de tâches</option><option value="libre">Question libre</option>
+        </select>
+        <button class="principal" id="ia-envoyer">Demander</button>
+      </form>
+    </div>
+    <div id="ia-reponse"></div>
+  </section>
+
+  <!-- RÉGLAGES -->
+  <section id="vue-reglages" class="vue">
+    <h1>Réglages</h1>
+    <div class="grille-2">
+      <form id="form-ia-config" class="carte">
+        <h2>Fournisseur d'IA</h2>
+        <label>Fournisseur <select id="c-fournisseur"></select></label>
+        <label>Modèle <input id="c-modele"></label>
+        <label>Clé d'API <input id="c-cle" type="password" autocomplete="off" placeholder="Laisser vide pour garder la clé actuelle"></label>
+        <p id="c-etat" class="discret"></p>
+        <div class="ligne"><button class="principal">Enregistrer</button><button type="button" id="c-effacer">Effacer la clé</button><button type="button" id="c-tester">Tester</button></div>
+        <p class="aide">La clé reste dans <code>config.json</code> sur ta machine ; elle n'est jamais renvoyée à la page ni publiée sur GitHub.</p>
+      </form>
+      <div class="carte">
+        <h2>Mon profil</h2>
+        <p class="aide">Le conseiller s'en sert pour personnaliser ses réponses.</p>
+        <textarea id="profil" rows="9"></textarea>
+        <button id="profil-enregistrer" class="principal">Enregistrer le profil</button>
+      </div>
+    </div>
+    <div class="grille-2">
+      <div class="carte">
+        <h2>Routine quotidienne</h2>
+        <ul id="liste-habitudes-reglages" class="liste"></ul>
+        <form id="form-habitude" class="ligne">
+          <input id="h-titre" placeholder="Nouvelle habitude" required>
+          <input id="h-min" type="number" min="5" step="5" placeholder="min" class="court">
+          <select id="h-cat"></select>
+          <button class="principal">Ajouter</button>
+        </form>
+      </div>
+      <div class="carte">
+        <h2>Catégories</h2>
+        <ul id="liste-categories" class="liste"></ul>
+        <form id="form-categorie" class="ligne">
+          <input id="cat-nom" placeholder="Nouvelle catégorie" required>
+          <button class="principal">Ajouter</button>
+        </form>
+        <h2>Sauvegarde</h2>
+        <div class="ligne">
+          <button id="exporter">Exporter (JSON)</button>
+          <label class="bouton">Importer <input id="importer" type="file" accept="application/json" hidden></label>
+        </div>
+        <p class="aide">Une copie automatique est faite chaque jour dans <code>sauvegardes/</code>.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="/ressources.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>

@@ -29,34 +29,54 @@ const CATEGORIES = ['Candidature', 'Entretiens', 'Compétence', 'Langue', 'Lectu
 // Anciennes catégories (première version) -> nouvelles.
 const ANCIENNES = { Candidatures: 'Candidature', 'Réseau': 'Candidature', 'Compétences': 'Compétence', Anglais: 'Langue', Posts: 'Compétence' };
 
+const PREFS = { prenom: 'Meriem', accent: 'terre', fleurs: true, theme: 'auto' };
+const ACCENTS = { terre: '#B4553A', rose: '#B5466B', prune: '#7A4A86', bleu: '#3D6A8C', vert: '#4E7D5B' };
+const NOMS_JOURS = ['lun', 'mar', 'mer', 'jeu', 'ven', 'sam', 'dim'];
+
+// Routine : une case à cocher, ou un compteur avec objectif (ex. 2 candidatures) ;
+// des thèmes qui tournent chaque jour ; des jours précis (vide = tous les jours).
+function routineDeBase() {
+  const h = (titre, categorie, minutes, plus = {}) => ({ id: nouvelId(), titre, categorie, minutes, actif: true,
+    type: 'case', objectif: 1, themes: [], jours: [], ...plus });
+  return [
+    h('Marche (au moins 15 min)', 'Santé', 15),
+    h('Candidatures ciblées (2 à 3)', 'Candidature', 60, { type: 'compteur', objectif: 2 }),
+    h('Apprendre un métier', 'Compétence', 30, { themes: ['Finance', 'Télécom', 'Marketing', 'RH et paie', 'Assurance', 'Logistique'] }),
+    h('Hard skill', 'Compétence', 45, { themes: ['SQL', 'Programmation Java', 'Algorithmes', 'Tests et QA', 'BPMN et processus', 'Git et DevOps'] }),
+    h('Lecture (15 min)', 'Lecture', 15),
+    h('Préparer les entretiens', 'Entretiens', 20, { themes: ['Se présenter', 'Question comportementale (STAR)', 'Question technique', "Connaître l'entreprise", 'Simulation complète'] }),
+    h('Anglais (30 min)', 'Langue', 30, { themes: ['Écoute (podcast, vidéo)', 'Parler à voix haute', 'Vocabulaire métier', 'Écrire un e-mail', 'Lire un article'] }),
+    h('Bilan du soir : 1 réussite, 1 chose apprise', 'Perso', 5, { actif: false }),
+    h('1 message ou commentaire LinkedIn', 'Candidature', 10, { actif: false }),
+    h('Préparer le post LinkedIn de la semaine', 'Compétence', 45, { actif: false, jours: [4] }),
+    h("Pas d'écran 30 min avant de dormir", 'Santé', 30, { actif: false }),
+  ];
+}
+
 let aMigrer = false;
 function migrer(d) {
-  if (!d.categories.some(c => c in ANCIENNES)) return d;
-  aMigrer = true;
-  const nv = c => ANCIENNES[c] || c;
-  d.taches.forEach(t => { t.categorie = nv(t.categorie); });
-  d.habitudes.forEach(h => { h.categorie = nv(h.categorie); });
-  d.categories = [...new Set([...CATEGORIES, ...d.categories.map(nv)])];
+  if (d.categories.some(c => c in ANCIENNES)) {
+    aMigrer = true;
+    const nv = c => ANCIENNES[c] || c;
+    d.taches.forEach(t => { t.categorie = nv(t.categorie); });
+    d.habitudes.forEach(h => { h.categorie = nv(h.categorie); });
+    d.categories = [...new Set([...CATEGORIES, ...d.categories.map(nv)])];
+  }
+  if (d.routineVersion !== 2) { d.habitudes = routineDeBase(); d.routineVersion = 2; aMigrer = true; }
+  d.habitudes.forEach(h => { h.type = h.type || 'case'; h.objectif = h.objectif || 1; h.themes = h.themes || []; h.jours = h.jours || []; });
+  d.prefs = { ...PREFS, ...(d.prefs || {}) };
   return d;
 }
 
 function donneesParDefaut() {
-  const h = (titre, categorie, minutes) => ({ id: nouvelId(), titre, categorie, minutes, actif: true });
   return {
     version: 1,
+    routineVersion: 2,
+    prefs: { ...PREFS },
     categories: CATEGORIES,
     taches: [],
-    habitudes: [
-      h('2 à 3 candidatures ciblées', 'Candidature', 60),
-      h('Relancer les candidatures de J-7', 'Candidature', 15),
-      h('Réseau LinkedIn : 3 messages, 3 commentaires', 'Candidature', 30),
-      h('Compétence du jour (SQL, QA, métier…)', 'Compétence', 60),
-      h('Entraînement entretien à voix haute', 'Entretiens', 20),
-      h('Anglais', 'Langue', 15),
-      h('Marche ou sport', 'Santé', 30),
-      h('Lecture', 'Lecture', 20),
-    ],
-    journal: {},      // 'AAAA-MM-JJ' -> { habitudes: [id], focus: minutes }
+    habitudes: routineDeBase(),
+    journal: {},      // 'AAAA-MM-JJ' -> { habitudes: [id], focus, compteurs: {id: n}, notes: {id: texte} }
     sessions: [],     // { date, minutes, tacheId }
     ressources: (window.RESSOURCES_DE_BASE || []).map(r => ({ ...r, id: nouvelId(), statut: 'a-faire', source: 'liste' })),
     profil: PROFIL_DEFAUT,
@@ -85,6 +105,20 @@ function jour(d) {
   return D.journal[d];
 }
 const habitudesActives = () => D.habitudes.filter(h => h.actif);
+const jourSemaine = s => ((versDate(s).getDay() + 6) % 7) + 1;          // 1 = lundi … 7 = dimanche
+const prevuLe = (h, s) => h.actif && (!h.jours.length || h.jours.includes(jourSemaine(s)));
+const habitudesDuJour = s => D.habitudes.filter(h => prevuLe(h, s));
+const faitesLe = s => (D.journal[s]?.habitudes || []).filter(id => habitudesDuJour(s).some(h => h.id === id)).length;
+const numeroJour = s => { const [a, m, j] = s.split('-').map(Number); return Math.round(Date.UTC(a, m - 1, j) / 864e5); };
+const themeDuJour = (h, s) => h.themes.length ? h.themes[numeroJour(s) % h.themes.length] : '';
+
+function appliquerPrefs() {
+  const p = D.prefs, r = document.documentElement;
+  if (p.theme === 'auto') r.removeAttribute('data-theme'); else r.setAttribute('data-theme', p.theme);
+  r.style.setProperty('--accent', ACCENTS[p.accent] || ACCENTS.terre);
+  r.style.setProperty('--accent-doux', `color-mix(in srgb, ${ACCENTS[p.accent] || ACCENTS.terre} 22%, var(--surface))`);
+  document.body.classList.toggle('sans-fleurs', !p.fleurs);
+}
 
 /* ---------- navigation ---------- */
 let vueCourante = 'aujourdhui';
@@ -152,8 +186,8 @@ function creerTache(champs) {
 
 /* ---------- AUJOURD'HUI ---------- */
 function serie() {
-  const n = habitudesActives().length; if (!n) return 0;
-  const reussi = d => (D.journal[d]?.habitudes.filter(id => D.habitudes.some(h => h.id === id && h.actif)).length || 0) / n >= 0.5;
+  if (!habitudesActives().length) return 0;
+  const reussi = d => { const n = habitudesDuJour(d).length; return n > 0 && faitesLe(d) / n >= 0.5; };
   let d = auj(), s = 0;
   if (!reussi(d)) d = ajouterJours(d, -1); // la journée en cours ne casse pas la série
   while (reussi(d)) { s++; d = ajouterJours(d, -1); }
@@ -162,12 +196,11 @@ function serie() {
 
 function rendreAujourdhui() {
   const a = auj(), j = jour(a);
+  const heure = new Date().getHours();
+  $('#salut').textContent = (heure < 18 ? 'Bonjour' : 'Bonsoir') + (D.prefs.prenom ? ' ' + D.prefs.prenom : '');
   $('#titre-jour').textContent = majuscule(fmtJour(a));
-  const hs = habitudesActives();
-  $('#liste-habitudes').innerHTML = hs.length ? hs.map(h => `<li data-h="${h.id}">
-      <input type="checkbox" ${j.habitudes.includes(h.id) ? 'checked' : ''} aria-label="Fait">
-      <span class="titre">${esc(h.titre)}</span><span class="puce">${esc(h.categorie)}</span>
-      <span class="meta">${h.minutes ? h.minutes + ' min' : ''}</span></li>`).join('')
+  const hs = habitudesDuJour(a);
+  $('#liste-habitudes').innerHTML = hs.length ? hs.map(h => ligneHabitude(h, a, j)).join('')
     : '<li class="vide">Ajoute ta routine dans Réglages.</li>';
   const faites = hs.filter(h => j.habitudes.includes(h.id)).length;
   $('#barre-habitudes').style.width = (hs.length ? faites / hs.length * 100 : 0) + '%';
@@ -188,6 +221,22 @@ function rendreAujourdhui() {
   sel.value = v;
   $('#focus-jour').textContent = `Concentration aujourd'hui : ${j.focus || 0} min`;
 }
+
+function ligneHabitude(h, s, j) {
+  const fait = j.habitudes.includes(h.id), n = j.compteurs?.[h.id] || 0, theme = themeDuJour(h, s), note = j.notes?.[h.id] || '';
+  const controle = h.type === 'compteur'
+    ? `<span class="compteur"><button data-action="moins" aria-label="Un de moins">−</button><b>${n}/${h.objectif}</b><button data-action="plus" aria-label="Un de plus">+</button></span>`
+    : `<input type="checkbox" data-action="cocher-h" ${fait ? 'checked' : ''} aria-label="Fait">`;
+  return `<li data-h="${h.id}" class="habitude ${fait ? 'faite' : ''}">
+    ${controle}
+    <span class="titre">${esc(h.titre)}${theme ? `<span class="theme">Aujourd'hui : ${esc(theme)}</span>` : ''}</span>
+    <span class="puce">${esc(h.categorie)}</span>
+    <span class="meta">${h.minutes ? h.minutes + ' min' : ''}</span>
+    <button class="bouton-note ${note ? 'a-note' : ''}" data-action="note" title="Note du jour">${note ? 'Note ✓' : 'Note'}</button>
+    <input class="note" data-action="note-texte" placeholder="Ce que j'ai fait ou appris aujourd'hui…" value="${esc(note)}" ${note ? '' : 'hidden'}>
+  </li>`;
+}
+const marquer = (j, h, fait) => { j.habitudes = fait ? [...new Set([...j.habitudes, h.id])] : j.habitudes.filter(x => x !== h.id); };
 
 /* minuteur de concentration */
 let minuteur = null; // { fin, duree, tacheId, debut }
@@ -239,14 +288,14 @@ let jourChoisi = auj();
 function rendreCalendrier() {
   $('#cal-titre').textContent = moisAffiche.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
   const debut = new Date(moisAffiche); debut.setDate(1 - ((debut.getDay() + 6) % 7)); // lundi
-  const n = habitudesActives().length, a = auj();
+  const a = auj();
   let html = '';
   for (let i = 0; i < 42; i++) {
     const d = new Date(debut); d.setDate(debut.getDate() + i);
     const s = iso(d);
     if (i === 35 && d.getMonth() !== moisAffiche.getMonth()) break;
     const evts = D.taches.filter(t => t.echeance === s || (t.faite && !t.echeance && t.faiteLe === s));
-    const h = D.journal[s]?.habitudes.length || 0;
+    const h = faitesLe(s), n = habitudesDuJour(s).length;
     html += `<button class="cal-jour ${d.getMonth() !== moisAffiche.getMonth() ? 'hors' : ''} ${s === a ? 'auj' : ''} ${s === jourChoisi ? 'choisi' : ''}" data-jour="${s}">
       <span class="num">${d.getDate()}</span>
       ${evts.slice(0, 3).map(t => `<span class="evt ${t.faite ? 'fait' : ''}">${esc(t.titre)}</span>`).join('')}
@@ -263,7 +312,9 @@ function rendreDetailJour() {
   const prevues = D.taches.filter(t => t.echeance === s);
   const finies = D.taches.filter(t => t.faite && t.faiteLe === s && t.echeance !== s);
   $('#cal-detail').innerHTML = `<h2>${esc(majuscule(fmtJour(s)))}</h2>
-    <p class="discret">Routine : ${j.habitudes.length}/${habitudesActives().length} · concentration : ${j.focus || 0} min</p>
+    <p class="discret">Routine : ${faitesLe(s)}/${habitudesDuJour(s).length} · concentration : ${j.focus || 0} min</p>
+    ${Object.keys(j.notes || {}).length ? `<h2 style="margin-top:14px">Notes du jour</h2><ul class="liste notes-jour">${Object.entries(j.notes).map(([id, txt]) =>
+      `<li><span class="titre"><b>${esc(D.habitudes.find(h => h.id === id)?.titre || 'Habitude')}</b> : ${esc(txt)}</span></li>`).join('')}</ul>` : ''}
     <h2 style="margin-top:14px">Prévu</h2>
     <ul class="liste">${prevues.length ? prevues.map(t => ligneTache(t, { date: false })).join('') : '<li class="vide">Rien de prévu.</li>'}</ul>
     ${finies.length ? `<h2 style="margin-top:14px">Terminé ce jour-là</h2><ul class="liste">${finies.map(t => ligneTache(t)).join('')}</ul>` : ''}
@@ -289,9 +340,9 @@ function rendreStats() {
   const jours = joursPeriode(periode).map(statsJour);
   const avant = joursPeriode(periode, ajouterJours(auj(), -periode)).map(statsJour);
   const somme = (l, k) => l.reduce((s, x) => s + x[k], 0);
-  const n = habitudesActives().length;
-  const taux = n ? Math.round(somme(jours, 'habitudes') / (n * periode) * 100) : 0;
-  const tauxAvant = n ? Math.round(somme(avant, 'habitudes') / (n * periode) * 100) : 0;
+  const tauxSur = l => { const prevu = l.reduce((s, x) => s + habitudesDuJour(x.date).length, 0);
+    return prevu ? Math.round(l.reduce((s, x) => s + faitesLe(x.date), 0) / prevu * 100) : 0; };
+  const taux = tauxSur(jours), tauxAvant = tauxSur(avant);
   const t = somme(jours, 'taches'), tAvant = somme(avant, 'taches');
   const f = somme(jours, 'focus');
   const delta = (x, y, u = '') => x === y ? 'comme la période précédente' : (x > y ? '+' : '−') + Math.abs(x - y) + u + ' vs période précédente';
@@ -306,9 +357,10 @@ function rendreStats() {
   graphBarresH('#graph-cats', D.categories.map(c => ({
     lib: c, val: D.taches.filter(x => x.faite && x.categorie === c && x.faiteLe && x.faiteLe > ajouterJours(auj(), -periode)).length,
   })).filter(x => x.val > 0).sort((a, b) => b.val - a.val), v => v, 'Aucune tâche terminée sur la période.');
-  graphBarresH('#graph-habitudes', habitudesActives().map(h => ({
-    lib: h.titre, val: Math.round(jours.filter(j => (D.journal[j.date]?.habitudes || []).includes(h.id)).length / periode * 100),
-  })), v => v + ' %', 'Aucune habitude active.', 100);
+  graphBarresH('#graph-habitudes', habitudesActives().map(h => {
+    const prevus = jours.filter(j => prevuLe(h, j.date));
+    return { lib: h.titre, val: prevus.length ? Math.round(prevus.filter(j => (D.journal[j.date]?.habitudes || []).includes(h.id)).length / prevus.length * 100) : 0 };
+  }), v => v + ' %', 'Aucune habitude active.', 100);
   carteChaleur();
 }
 
@@ -413,14 +465,14 @@ let derniereProposition = null;
 
 function contexte() {
   const jours = joursPeriode(30).map(statsJour);
-  const n = habitudesActives().length;
+  const prevu = jours.reduce((s, j) => s + habitudesDuJour(j.date).length, 0);
   const parCat = D.categories.map(c => c + ' ' + D.taches.filter(t => t.faite && t.categorie === c && t.faiteLe > ajouterJours(auj(), -30)).length).join(', ');
   const parHab = habitudesActives().map(h => h.titre + ' ' + Math.round(jours.filter(j => (D.journal[j.date]?.habitudes || []).includes(h.id)).length / 30 * 100) + '%').join(' ; ');
   return `Date du jour : ${auj()}.
 PROFIL :
 ${D.profil}
 
-STATISTIQUES (30 derniers jours) : ${jours.reduce((s, j) => s + j.taches, 0)} tâches terminées ; routine réalisée à ${n ? Math.round(jours.reduce((s, j) => s + j.habitudes, 0) / (n * 30) * 100) : 0} % ; série en cours ${serie()} jours ; ${jours.reduce((s, j) => s + j.focus, 0)} min de concentration.
+STATISTIQUES (30 derniers jours) : ${jours.reduce((s, j) => s + j.taches, 0)} tâches terminées ; routine réalisée à ${prevu ? Math.round(jours.reduce((s, j) => s + faitesLe(j.date), 0) / prevu * 100) : 0} % ; série en cours ${serie()} jours ; ${jours.reduce((s, j) => s + j.focus, 0)} min de concentration.
 Tâches terminées par catégorie : ${parCat}.
 Réussite par habitude : ${parHab}.
 TÂCHES OUVERTES : ${D.taches.filter(t => !t.faite).slice(0, 20).map(t => t.titre + (t.echeance ? ' (' + t.echeance + ')' : '')).join(' ; ') || 'aucune'}.
@@ -506,11 +558,23 @@ function majEtatCle() {
 
 function rendreReglages() {
   $('#profil').value = D.profil || '';
-  $('#liste-habitudes-reglages').innerHTML = D.habitudes.map(h => `<li data-h="${h.id}">
-    <input type="checkbox" data-action="actif" ${h.actif ? 'checked' : ''} title="Active">
-    <span class="titre">${esc(h.titre)}</span><span class="puce">${esc(h.categorie)}</span>
-    <span class="meta">${h.minutes ? h.minutes + ' min' : ''}</span>
-    <span class="actions"><button data-action="suppr-h">×</button></span></li>`).join('') || '<li class="vide">Aucune habitude.</li>';
+  $('#liste-habitudes-reglages').innerHTML = D.habitudes.map((h, i) => `<li data-h="${h.id}" class="${h.actif ? '' : 'inactive'}">
+    <input type="checkbox" data-action="actif" ${h.actif ? 'checked' : ''} title="${h.actif ? 'Active' : 'Inactive : coche pour l’ajouter à ta routine'}">
+    <span class="titre">${esc(h.titre)}
+      <span class="meta">${[h.type === 'compteur' ? 'objectif ' + h.objectif : '', h.minutes ? h.minutes + ' min' : '',
+        h.jours.length ? h.jours.map(n => NOMS_JOURS[n - 1]).join(', ') : 'tous les jours',
+        h.themes.length ? h.themes.length + ' thèmes' : ''].filter(Boolean).join(' · ')}</span></span>
+    <span class="puce">${esc(h.categorie)}</span>
+    <span class="actions">
+      <button data-action="monter-h" title="Monter" ${i === 0 ? 'disabled' : ''}>↑</button>
+      <button data-action="descendre-h" title="Descendre" ${i === D.habitudes.length - 1 ? 'disabled' : ''}>↓</button>
+      <button data-action="modifier-h">Modifier</button>
+      <button data-action="suppr-h" title="Supprimer">×</button>
+    </span></li>`).join('') || '<li class="vide">Aucune habitude.</li>';
+  const p = D.prefs;
+  $('#p-prenom').value = p.prenom || '';
+  $('#p-theme').value = p.theme; $('#p-fleurs').checked = p.fleurs;
+  $$('#p-accents button').forEach(b => b.classList.toggle('actif', b.dataset.accent === p.accent));
   $('#liste-categories').innerHTML = D.categories.map((c, i) => `<li data-c="${esc(c)}"><span class="titre">${esc(c)}</span>
     <span class="meta">${D.taches.filter(t => t.categorie === c).length} tâche(s) · ${D.habitudes.filter(h => h.categorie === c).length} habitude(s)</span>
     <span class="actions">
@@ -526,10 +590,23 @@ function brancher() {
   $$('.onglets button').forEach(b => b.addEventListener('click', () => afficherVue(b.dataset.vue)));
   ['#liste-jour', '#liste-taches', '#cal-detail'].forEach(s => $(s).addEventListener('click', actionTache));
 
+  $('#liste-habitudes').addEventListener('click', e => {
+    const b = e.target.closest('[data-action]'); if (!b) return;
+    const li = b.closest('[data-h]'), h = D.habitudes.find(x => x.id === li.dataset.h), j = jour(auj()), a = b.dataset.action;
+    if (a === 'cocher-h') marquer(j, h, b.checked);
+    else if (a === 'plus' || a === 'moins') {
+      j.compteurs = j.compteurs || {};
+      const n = Math.max(0, (j.compteurs[h.id] || 0) + (a === 'plus' ? 1 : -1));
+      j.compteurs[h.id] = n; marquer(j, h, n >= h.objectif);
+    } else if (a === 'note') { const i = li.querySelector('.note'); i.hidden = !i.hidden; if (!i.hidden) i.focus(); return; }
+    else return;
+    sauver(); rendreAujourdhui();
+  });
   $('#liste-habitudes').addEventListener('change', e => {
-    const li = e.target.closest('[data-h]'); if (!li) return;
-    const j = jour(auj()), id = li.dataset.h;
-    j.habitudes = e.target.checked ? [...new Set([...j.habitudes, id])] : j.habitudes.filter(x => x !== id);
+    if (e.target.dataset.action !== 'note-texte') return;
+    const id = e.target.closest('[data-h]').dataset.h, j = jour(auj()), v = e.target.value.trim();
+    j.notes = j.notes || {};
+    if (v) j.notes[id] = v; else delete j.notes[id];
     sauver(); rendreAujourdhui();
   });
   $('#ajout-rapide').addEventListener('submit', e => {
@@ -655,17 +732,57 @@ function brancher() {
   });
   $('#profil-enregistrer').addEventListener('click', () => { D.profil = $('#profil').value; sauver(); });
 
+  let habitudeEnCours = null; // id de l'habitude en cours de modification
+  const viderFormHabitude = () => {
+    habitudeEnCours = null; $('#form-habitude').reset(); $('#h-objectif').value = 2; majFormHabitude();
+    $$('#h-jours input').forEach(c => { c.checked = false; });
+    $('#h-valider').textContent = 'Ajouter'; $('#h-annuler').hidden = true;
+  };
+  const majFormHabitude = () => { $('#h-objectif-label').hidden = $('#h-type').value !== 'compteur'; };
+  $('#h-type').addEventListener('change', majFormHabitude);
+  $('#h-annuler').addEventListener('click', viderFormHabitude);
   $('#liste-habitudes-reglages').addEventListener('click', e => {
     const b = e.target.closest('[data-action]'); if (!b) return;
-    const h = D.habitudes.find(x => x.id === b.closest('[data-h]').dataset.h);
-    if (b.dataset.action === 'actif') h.actif = b.checked;
-    if (b.dataset.action === 'suppr-h' && confirm('Supprimer l’habitude « ' + h.titre + ' » ? Son historique sera conservé dans les statistiques globales.')) D.habitudes = D.habitudes.filter(x => x !== h);
+    const h = D.habitudes.find(x => x.id === b.closest('[data-h]').dataset.h), i = D.habitudes.indexOf(h), a = b.dataset.action;
+    if (a === 'actif') h.actif = b.checked;
+    if (a === 'monter-h' || a === 'descendre-h') {
+      const k = a === 'monter-h' ? i - 1 : i + 1;
+      if (k >= 0 && k < D.habitudes.length) [D.habitudes[i], D.habitudes[k]] = [D.habitudes[k], D.habitudes[i]];
+    }
+    if (a === 'modifier-h') {
+      habitudeEnCours = h.id;
+      $('#h-titre').value = h.titre; $('#h-cat').value = h.categorie; $('#h-min').value = h.minutes || '';
+      $('#h-type').value = h.type; $('#h-objectif').value = h.objectif; $('#h-themes').value = h.themes.join(', ');
+      $$('#h-jours input').forEach(c => { c.checked = h.jours.includes(+c.value); });
+      majFormHabitude(); $('#h-valider').textContent = 'Enregistrer'; $('#h-annuler').hidden = false;
+      $('#form-habitude').scrollIntoView({ behavior: 'smooth', block: 'center' }); $('#h-titre').focus();
+      return;
+    }
+    if (a === 'suppr-h' && confirm('Supprimer l’habitude « ' + h.titre + ' » ? Les jours passés restent dans les statistiques d’activité.')) D.habitudes = D.habitudes.filter(x => x !== h);
     sauver(); rendreReglages();
   });
   $('#form-habitude').addEventListener('submit', e => {
     e.preventDefault();
-    D.habitudes.push({ id: nouvelId(), titre: $('#h-titre').value.trim(), categorie: $('#h-cat').value, minutes: +$('#h-min').value || null, actif: true });
-    e.target.reset(); remplirCategories(); sauver(); rendreReglages();
+    const champs = {
+      titre: $('#h-titre').value.trim(), categorie: $('#h-cat').value, minutes: +$('#h-min').value || null,
+      type: $('#h-type').value, objectif: Math.max(1, +$('#h-objectif').value || 1),
+      themes: $('#h-themes').value.split(',').map(x => x.trim()).filter(Boolean),
+      jours: $$('#h-jours input').filter(c => c.checked).map(c => +c.value),
+    };
+    if (champs.type === 'case') champs.objectif = 1;
+    const h = D.habitudes.find(x => x.id === habitudeEnCours);
+    if (h) Object.assign(h, champs); else D.habitudes.push({ id: nouvelId(), actif: true, ...champs });
+    viderFormHabitude(); remplirCategories(); sauver(); rendreReglages();
+  });
+  majFormHabitude();
+  // personnalisation
+  const majPrefs = () => { appliquerPrefs(); sauver(); };
+  $('#p-prenom').addEventListener('change', e => { D.prefs.prenom = e.target.value.trim(); majPrefs(); });
+  $('#p-theme').addEventListener('change', e => { D.prefs.theme = e.target.value; majPrefs(); });
+  $('#p-fleurs').addEventListener('change', e => { D.prefs.fleurs = e.target.checked; majPrefs(); });
+  $('#p-accents').addEventListener('click', e => {
+    const b = e.target.closest('[data-accent]'); if (!b) return;
+    D.prefs.accent = b.dataset.accent; majPrefs(); rendreReglages();
   });
   $('#form-categorie').addEventListener('submit', e => {
     e.preventDefault();
@@ -723,7 +840,7 @@ function brancher() {
 
 function completer(d) {
   const base = donneesParDefaut();
-  for (const k of Object.keys(base)) if (d[k] === undefined) d[k] = base[k];
+  for (const k of Object.keys(base)) if (d[k] === undefined && k !== 'routineVersion') d[k] = base[k];
   return migrer(d);
 }
 
@@ -738,6 +855,7 @@ function completer(d) {
     return;
   }
   remplirCategories();
+  appliquerPrefs();
   brancher();
   chargerConfig();
   let v = 'aujourdhui';

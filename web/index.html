@@ -24,6 +24,7 @@
 <main>
   <!-- AUJOURD'HUI -->
   <section id="vue-aujourdhui" class="vue actif">
+    <p id="salut" class="salut"></p>
     <h1 id="titre-jour"></h1>
     <div class="grille-2">
       <div class="carte">
@@ -198,6 +199,22 @@
         <p class="aide">La clé reste dans <code>config.json</code> sur ta machine ; elle n'est jamais renvoyée à la page ni publiée sur GitHub.</p>
       </form>
       <div class="carte">
+        <h2>Personnalisation</h2>
+        <label>Ton prénom <input id="p-prenom" placeholder="Meriem"></label>
+        <label>Thème
+          <select id="p-theme"><option value="auto">Automatique (comme le système)</option><option value="light">Clair</option><option value="dark">Sombre</option></select>
+        </label>
+        <label class="en-ligne"><input id="p-fleurs" type="checkbox"> Fond fleuri</label>
+        <p class="discret" style="margin:8px 0 6px">Couleur principale</p>
+        <div id="p-accents" class="accents">
+          <button data-accent="terre" style="--c:#B4553A" title="Terre"></button>
+          <button data-accent="rose" style="--c:#B5466B" title="Rose"></button>
+          <button data-accent="prune" style="--c:#7A4A86" title="Prune"></button>
+          <button data-accent="bleu" style="--c:#3D6A8C" title="Bleu"></button>
+          <button data-accent="vert" style="--c:#4E7D5B" title="Vert"></button>
+        </div>
+      </div>
+      <div class="carte">
         <h2>Mon profil</h2>
         <p class="aide">Le conseiller s'en sert pour personnaliser ses réponses.</p>
         <textarea id="profil" rows="9"></textarea>
@@ -207,12 +224,29 @@
     <div class="grille-2">
       <div class="carte">
         <h2>Routine quotidienne</h2>
+        <p class="aide">Décoche une habitude pour la mettre en pause. Les suggestions décochées sont là si tu veux les essayer.</p>
         <ul id="liste-habitudes-reglages" class="liste"></ul>
-        <form id="form-habitude" class="ligne">
-          <input id="h-titre" placeholder="Nouvelle habitude" required>
-          <input id="h-min" type="number" min="5" step="5" placeholder="min" class="court">
-          <select id="h-cat"></select>
-          <button class="principal">Ajouter</button>
+        <form id="form-habitude" class="form-habitude">
+          <input id="h-titre" placeholder="Nom de l'habitude (ex. Anglais 30 min)" required>
+          <div class="ligne">
+            <select id="h-cat" title="Catégorie"></select>
+            <input id="h-min" type="number" min="5" step="5" placeholder="min" class="court" title="Durée en minutes">
+            <select id="h-type" title="Type">
+              <option value="case">Case à cocher</option>
+              <option value="compteur">Compteur avec objectif</option>
+            </select>
+            <label id="h-objectif-label" class="en-ligne">objectif <input id="h-objectif" type="number" min="1" value="2" class="court"></label>
+          </div>
+          <input id="h-themes" placeholder="Thèmes qui tournent chaque jour, séparés par des virgules (facultatif) : Finance, Télécom, Marketing">
+          <div class="ligne" id="h-jours" title="Jours (aucun coché = tous les jours)">
+            <span class="discret" style="margin:0">Jours :</span>
+            <label class="jour"><input type="checkbox" value="1">lun</label><label class="jour"><input type="checkbox" value="2">mar</label>
+            <label class="jour"><input type="checkbox" value="3">mer</label><label class="jour"><input type="checkbox" value="4">jeu</label>
+            <label class="jour"><input type="checkbox" value="5">ven</label><label class="jour"><input type="checkbox" value="6">sam</label>
+            <label class="jour"><input type="checkbox" value="7">dim</label>
+            <span class="discret" style="margin:0">(aucun = tous les jours)</span>
+          </div>
+          <div class="ligne"><button id="h-valider" class="principal">Ajouter</button><button type="button" id="h-annuler" hidden>Annuler</button></div>
         </form>
       </div>
       <div class="carte">

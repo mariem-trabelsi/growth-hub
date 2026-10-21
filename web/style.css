@@ -188,3 +188,35 @@ details.carte form { margin-top: 12px; grid-template-columns: 2fr 2fr 1fr 1fr au
 #ia-reponse .conseil { white-space: pre-wrap; }
 .chargement { color: var(--encre-2); font-style: italic; }
 .erreur { color: var(--rouge); }
+
+/* Personnalisation */
+.salut { margin: 0; color: var(--accent); font-weight: 700; font-size: 15px; }
+body.sans-fleurs { background-image: none; }
+.accents { display: flex; gap: 10px; }
+.accents button { width: 30px; height: 30px; border-radius: 50%; background: var(--c); border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--bord); padding: 0; }
+.accents button:hover { background: var(--c); filter: brightness(1.1); }
+.accents button.actif { box-shadow: 0 0 0 2px var(--encre); }
+label.en-ligne { display: inline-flex; align-items: center; gap: 6px; margin: 0; color: var(--encre-2); }
+label.en-ligne input { display: inline-block; width: auto; margin: 0; }
+label.jour { display: inline-flex; align-items: center; gap: 3px; margin: 0; font-size: 13.5px; color: var(--encre-2); }
+label.jour input { display: inline; width: auto; margin: 0; accent-color: var(--accent); }
+.form-habitude { display: grid; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--bord); }
+.form-habitude > input { width: 100%; }
+#vue-reglages > .grille-2 { align-items: start; }
+#vue-reglages > .grille-2:first-of-type { grid-template-columns: 1fr 1fr 1fr; }
+@media (max-width: 1000px) { #vue-reglages > .grille-2:first-of-type { grid-template-columns: 1fr; } }
+.liste li.inactive .titre { color: var(--encre-3); }
+.liste .titre .meta { display: block; white-space: normal; }
+
+/* Routine du jour */
+.liste li.habitude { flex-wrap: wrap; }
+.liste li.habitude.faite .titre { text-decoration: none; color: var(--encre-2); }
+.liste li.habitude.faite .titre::before { content: "✓ "; color: var(--vert); font-weight: 700; }
+.theme { display: block; font-size: 12.5px; color: var(--accent); }
+.compteur { display: inline-flex; align-items: center; gap: 4px; flex: none; }
+.compteur button { width: 26px; height: 26px; padding: 0; border-radius: 6px; line-height: 1; }
+.compteur b { min-width: 30px; text-align: center; font-variant-numeric: tabular-nums; }
+.bouton-note { padding: 2px 8px; font-size: 12.5px; color: var(--encre-2); }
+.bouton-note.a-note { color: var(--vert); border-color: var(--vert); }
+.liste li .note { flex: 1 1 100%; margin-left: 28px; font-size: 13.5px; }
+.notes-jour li { font-size: 13.5px; }

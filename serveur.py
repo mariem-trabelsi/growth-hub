@@ -35,7 +35,7 @@ STATIQUES = {
 FOURNISSEURS = {
     'gemini': {'nom': 'Google Gemini (gratuit, clé sur aistudio.google.com)',
                'url': 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
-               'modele': 'gemini-2.5-flash', 'cle': True},
+               'modele': 'gemini-3.8-flash', 'cle': True},
     'groq': {'nom': 'Groq (gratuit, clé sur console.groq.com)',
              'url': 'https://api.groq.com/openai/v1/chat/completions',
              'modele': 'llama-3.3-70b-versatile', 'cle': True},

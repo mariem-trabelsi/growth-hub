@@ -25,6 +25,7 @@
     --s0: #332A25; --s1: #5A3428; --s2: #8A4632; --s3: #C2603F; --s4: #F09A78;
     --ombre: none; color-scheme: dark;
   }
+  :root:not([data-theme="light"]) body { background-blend-mode: soft-light; }
 }
 :root[data-theme="dark"] {
   --fond: #1E1916; --surface: #28211D; --surface-2: #332A25; --encre: #F2E8DF; --encre-2: #C6B5A9;
@@ -36,7 +37,9 @@
 
 * { box-sizing: border-box; }
 body {
-  margin: 0; background: var(--fond); color: var(--encre);
+  margin: 0; color: var(--encre);
+  /* fond fleuri discret ; les cartes restent opaques pour la lecture */
+  background: var(--fond) url("/fleurs.svg") repeat fixed;
   font: 15px/1.5 "Carlito", "Calibri", system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 h1 { font-size: 26px; margin: 4px 0 18px; font-weight: 700; }

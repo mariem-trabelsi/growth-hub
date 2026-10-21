@@ -29,6 +29,7 @@ STATIQUES = {
     '/app.js': ('web/app.js', 'application/javascript; charset=utf-8'),
     '/style.css': ('web/style.css', 'text/css; charset=utf-8'),
     '/ressources.js': ('web/ressources.js', 'application/javascript; charset=utf-8'),
+    '/fleurs.svg': ('web/fleurs.svg', 'image/svg+xml'),
 }
 
 # Fournisseurs compatibles avec l'API « chat completions » d'OpenAI.

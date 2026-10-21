@@ -25,19 +25,36 @@ Projet de fin d'études : plateforme de commande fibre (Order-to-Activate) align
 Points à renforcer : anglais oral (B2), connaissances métier (finance, paie/DSN, AML, télécom), outils QA (ISTQB).
 Préférence : ressources gratuites, en français ou en anglais simple.`;
 
+const CATEGORIES = ['Candidature', 'Entretiens', 'Compétence', 'Langue', 'Lecture', 'Santé', 'Perso'];
+// Anciennes catégories (première version) -> nouvelles.
+const ANCIENNES = { Candidatures: 'Candidature', 'Réseau': 'Candidature', 'Compétences': 'Compétence', Anglais: 'Langue', Posts: 'Compétence' };
+
+let aMigrer = false;
+function migrer(d) {
+  if (!d.categories.some(c => c in ANCIENNES)) return d;
+  aMigrer = true;
+  const nv = c => ANCIENNES[c] || c;
+  d.taches.forEach(t => { t.categorie = nv(t.categorie); });
+  d.habitudes.forEach(h => { h.categorie = nv(h.categorie); });
+  d.categories = [...new Set([...CATEGORIES, ...d.categories.map(nv)])];
+  return d;
+}
+
 function donneesParDefaut() {
   const h = (titre, categorie, minutes) => ({ id: nouvelId(), titre, categorie, minutes, actif: true });
   return {
     version: 1,
-    categories: ['Candidatures', 'Réseau', 'Compétences', 'Anglais', 'Posts', 'Entretiens', 'Perso'],
+    categories: CATEGORIES,
     taches: [],
     habitudes: [
-      h('2 à 3 candidatures ciblées', 'Candidatures', 60),
-      h('Relancer les candidatures de J-7', 'Candidatures', 15),
-      h('Réseau LinkedIn : 3 messages, 3 commentaires', 'Réseau', 30),
-      h('Compétence du jour (SQL, QA, métier…)', 'Compétences', 60),
+      h('2 à 3 candidatures ciblées', 'Candidature', 60),
+      h('Relancer les candidatures de J-7', 'Candidature', 15),
+      h('Réseau LinkedIn : 3 messages, 3 commentaires', 'Candidature', 30),
+      h('Compétence du jour (SQL, QA, métier…)', 'Compétence', 60),
       h('Entraînement entretien à voix haute', 'Entretiens', 20),
-      h('Anglais', 'Anglais', 15),
+      h('Anglais', 'Langue', 15),
+      h('Marche ou sport', 'Santé', 30),
+      h('Lecture', 'Lecture', 20),
     ],
     journal: {},      // 'AAAA-MM-JJ' -> { habitudes: [id], focus: minutes }
     sessions: [],     // { date, minutes, tacheId }
@@ -386,7 +403,8 @@ function rendreRessources() {
 }
 
 function planifierRessource(r) {
-  creerTache({ titre: 'Étudier : ' + r.titre, categorie: D.categories.includes('Compétences') ? 'Compétences' : D.categories[0],
+  const cat = /anglais|english|langue/i.test((r.domaine || '') + r.titre) ? 'Langue' : 'Compétence';
+  creerTache({ titre: 'Étudier : ' + r.titre, categorie: D.categories.includes(cat) ? cat : D.categories[0],
                echeance: auj(), notes: urlSure(r.url) || lienRecherche(r) });
 }
 
@@ -493,9 +511,14 @@ function rendreReglages() {
     <span class="titre">${esc(h.titre)}</span><span class="puce">${esc(h.categorie)}</span>
     <span class="meta">${h.minutes ? h.minutes + ' min' : ''}</span>
     <span class="actions"><button data-action="suppr-h">×</button></span></li>`).join('') || '<li class="vide">Aucune habitude.</li>';
-  $('#liste-categories').innerHTML = D.categories.map(c => `<li data-c="${esc(c)}"><span class="titre">${esc(c)}</span>
-    <span class="meta">${D.taches.filter(t => t.categorie === c).length} tâche(s)</span>
-    <span class="actions"><button data-action="suppr-c">×</button></span></li>`).join('');
+  $('#liste-categories').innerHTML = D.categories.map((c, i) => `<li data-c="${esc(c)}"><span class="titre">${esc(c)}</span>
+    <span class="meta">${D.taches.filter(t => t.categorie === c).length} tâche(s) · ${D.habitudes.filter(h => h.categorie === c).length} habitude(s)</span>
+    <span class="actions">
+      <button data-action="monter-c" title="Monter" ${i === 0 ? 'disabled' : ''}>↑</button>
+      <button data-action="descendre-c" title="Descendre" ${i === D.categories.length - 1 ? 'disabled' : ''}>↓</button>
+      <button data-action="renommer-c" title="Renommer">Renommer</button>
+      <button data-action="suppr-c" title="Supprimer">×</button>
+    </span></li>`).join('');
 }
 
 /* ---------- événements ---------- */
@@ -651,11 +674,31 @@ function brancher() {
     e.target.reset(); remplirCategories(); sauver(); rendreReglages();
   });
   $('#liste-categories').addEventListener('click', e => {
-    const b = e.target.closest('[data-action="suppr-c"]'); if (!b) return;
-    const c = b.closest('[data-c]').dataset.c;
-    if (D.categories.length === 1) return alert('Il faut garder au moins une catégorie.');
-    if (!confirm('Supprimer la catégorie « ' + c + ' » ? Ses tâches la gardent comme étiquette.')) return;
-    D.categories = D.categories.filter(x => x !== c); remplirCategories(); sauver(); rendreReglages();
+    const b = e.target.closest('button[data-action]'); if (!b) return;
+    const c = b.closest('[data-c]').dataset.c, i = D.categories.indexOf(c), a = b.dataset.action;
+    if (a === 'monter-c' || a === 'descendre-c') {
+      const j = a === 'monter-c' ? i - 1 : i + 1;
+      if (j < 0 || j >= D.categories.length) return;
+      [D.categories[i], D.categories[j]] = [D.categories[j], D.categories[i]];
+    }
+    if (a === 'renommer-c') {
+      const nom = (prompt('Nouveau nom de la catégorie', c) || '').trim();
+      if (!nom || nom === c) return;
+      if (D.categories.includes(nom) && !confirm('« ' + nom + ' » existe déjà : fusionner les deux catégories ?')) return;
+      D.categories = D.categories.includes(nom) ? D.categories.filter(x => x !== c) : D.categories.map(x => x === c ? nom : x);
+      D.taches.forEach(t => { if (t.categorie === c) t.categorie = nom; });
+      D.habitudes.forEach(h => { if (h.categorie === c) h.categorie = nom; });
+    }
+    if (a === 'suppr-c') {
+      if (D.categories.length === 1) return alert('Il faut garder au moins une catégorie.');
+      const n = D.taches.filter(t => t.categorie === c).length + D.habitudes.filter(h => h.categorie === c).length;
+      const vers = D.categories.find(x => x !== c);
+      if (!confirm('Supprimer la catégorie « ' + c + ' » ?' + (n ? ' Ses ' + n + ' tâche(s) et habitude(s) passeront dans « ' + vers + ' ».' : ''))) return;
+      D.taches.forEach(t => { if (t.categorie === c) t.categorie = vers; });
+      D.habitudes.forEach(h => { if (h.categorie === c) h.categorie = vers; });
+      D.categories = D.categories.filter(x => x !== c);
+    }
+    remplirCategories(); sauver(); rendreReglages();
   });
   $('#exporter').addEventListener('click', () => {
     const a = document.createElement('a');
@@ -681,7 +724,7 @@ function brancher() {
 function completer(d) {
   const base = donneesParDefaut();
   for (const k of Object.keys(base)) if (d[k] === undefined) d[k] = base[k];
-  return d;
+  return migrer(d);
 }
 
 /* ---------- démarrage ---------- */
@@ -689,7 +732,7 @@ function completer(d) {
   try {
     const d = await (await fetch('/api/donnees')).json();
     D = d ? completer(d) : donneesParDefaut();
-    if (!d) sauver();
+    if (!d || aMigrer) sauver();
   } catch (e) {
     document.body.innerHTML = '<main><div class="carte erreur">Le serveur local ne répond pas. Lance « python3 serveur.py » puis recharge la page.</div></main>';
     return;

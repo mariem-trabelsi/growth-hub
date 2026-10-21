@@ -96,7 +96,7 @@ def appeler_ia(messages, json_attendu):
     if p['cle'] and not cle:
         raise RuntimeError("Aucune clé d'API pour %s : ajoute-la dans Réglages." % p['nom'])
     corps = {'model': c.get('modele') or p['modele'], 'messages': messages, 'temperature': 0.4}
-    if json_attendu and f in ('gemini', 'groq', 'openrouter'):
+    if json_attendu:  # Ollama le gère aussi via son API compatible OpenAI
         corps['response_format'] = {'type': 'json_object'}
     # Certains fournisseurs (derrière Cloudflare) refusent l'agent « Python-urllib » par défaut.
     entetes = {'Content-Type': 'application/json', 'User-Agent': 'growth-hub/1.0'}
@@ -107,7 +107,7 @@ def appeler_ia(messages, json_attendu):
         # Surcharge ou quota momentané (429, 5xx) : on réessaie deux fois, après 2 puis 5 secondes.
         for attente in (2, 5, None):
             try:
-                with urllib.request.urlopen(urllib.request.Request(p['url'], data=donnees, headers=entetes), timeout=90) as r:
+                with urllib.request.urlopen(urllib.request.Request(p['url'], data=donnees, headers=entetes), timeout=300 if f == 'ollama' else 90) as r:
                     rep = json.load(r)
                 break
             except urllib.error.HTTPError as e:

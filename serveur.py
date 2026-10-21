@@ -13,7 +13,7 @@ Les données restent sur ta machine :
 Le navigateur ne parle qu'à ce serveur ; c'est lui qui appelle l'IA, pour que la
 clé ne soit jamais exposée dans la page.
 """
-import json, os, shutil, sys, urllib.error, urllib.request
+import json, os, shutil, sys, time, urllib.error, urllib.request
 from datetime import date
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -102,13 +102,28 @@ def appeler_ia(messages, json_attendu):
     entetes = {'Content-Type': 'application/json', 'User-Agent': 'growth-hub/1.0'}
     if cle:
         entetes['Authorization'] = 'Bearer ' + cle
-    req = urllib.request.Request(p['url'], data=json.dumps(corps).encode('utf-8'), headers=entetes)
+    donnees = json.dumps(corps).encode('utf-8')
     try:
-        with urllib.request.urlopen(req, timeout=90) as r:
-            rep = json.load(r)
-    except urllib.error.HTTPError as e:
-        detail = e.read().decode('utf-8', 'replace')[:400]
-        raise RuntimeError('Le fournisseur a répondu %s : %s' % (e.code, detail))
+        # Surcharge ou quota momentané (429, 5xx) : on réessaie deux fois, après 2 puis 5 secondes.
+        for attente in (2, 5, None):
+            try:
+                with urllib.request.urlopen(urllib.request.Request(p['url'], data=donnees, headers=entetes), timeout=90) as r:
+                    rep = json.load(r)
+                break
+            except urllib.error.HTTPError as e:
+                if e.code in (429, 500, 502, 503, 504) and attente:
+                    time.sleep(attente)
+                    continue
+                detail = e.read().decode('utf-8', 'replace')[:400]
+                if e.code == 429:
+                    raise RuntimeError("Limite gratuite atteinte pour le moment : réessaie dans une minute "
+                                       "(ou change de fournisseur dans Réglages).")
+                if e.code in (500, 502, 503, 504):
+                    raise RuntimeError('Le service de %s est surchargé en ce moment. Réessaie dans quelques minutes, '
+                                       'ou choisis un autre fournisseur ou modèle dans Réglages.' % p['nom'].split(' (')[0])
+                if e.code in (401, 403):
+                    raise RuntimeError("Clé d'API refusée : vérifie-la dans Réglages. (%s)" % detail)
+                raise RuntimeError('Le fournisseur a répondu %s : %s' % (e.code, detail))
     except urllib.error.URLError as e:
         raise RuntimeError('Impossible de joindre %s (%s). Ollama est-il lancé ?' % (p['nom'], e.reason)
                            if f == 'ollama' else 'Impossible de joindre %s : %s' % (p['nom'], e.reason))
